@@ -1,4 +1,3 @@
-import time
 import sys
 import requests
 import socket
@@ -6,7 +5,6 @@ import os
 import subprocess
 import threading
 import signal
-import httplib2
 
 def bridges_handler(file_path):
     with open(file_path) as f:
