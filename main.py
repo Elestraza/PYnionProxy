@@ -1,58 +1,52 @@
+import http.client
+import os
 import sys
 import requests
 import socket
-import os
-import subprocess
-import threading
+import urllib.request
+import socketserver
+import socks
 import signal
-
-def bridges_handler(file_path):
-    with open(file_path) as f:
-        lines = [line.rstrip('\n') for line in f]
-    return lines
+import TorHandlerClass
 
 PROXIES = {
     'ip':       '127.0.0.1',
-    'port':     9051,
-    'http':     'socks5h://127.0.0.1:9051',
-    'https':    'socks5h://127.0.0.1:9051'
+    'port':     9150
 }
-session = requests.session()
+
+# --- Configuration ---
+PROXY_HOST = "localhost"
+PROXY_PORT = 8888  # Port your custom proxy will listen on
+TOR_SOCKS_PROXY = "127.0.0.1"
+TOR_SOCKS_PORT = 9150
+
+session = requests.Session()
 session.proxies = PROXIES 
-print("Tor Proxies: ", session.proxies['http'], session.proxies['https'])
-
-def tor_init():
-    user_torrc = input(str("Enter location of your torrc file: "))
-    INSTALL_PATH = 'C:\\Users\\Elestraza\\Desktop\\Tor Browser\\Browser\\TorBrowser\\Tor\\tor.exe -f' + user_torrc
-
-    torDeamon = subprocess.Popen(INSTALL_PATH) #, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print("Tor deamon started on pid: ", torDeamon.pid)
-
-def handle_client(client_socket):
-    # Process client requests and send to internet
-    pass
+print("Tor Proxies: ", session.proxies)
 
 def start_proxy(proxies):
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind((session.proxies['ip'], session.proxies['port']))
-    server.listen(100)
-    print(f"[*] Listening on {"127.0.0.1"}:{9051}")
-    
-    while True:
-        client_sock, addr = server.accept()
-        print(f"[*] Accepted connection from {addr[0]}:{addr[1]}")
-        proxy_thread = threading.Thread(target=handle_client, args=(client_sock))
-        proxy_thread.start()  
+    socks.set_default_proxy(socks.PROXY_TYPE_SOCKS5, TOR_SOCKS_PROXY, TOR_SOCKS_PORT, True)
+    socket.socket = socks.socksocket
+    print("Connected to TOR network...")
+
+    conn = http.client.HTTPConnection(host="2ip.ru")
+    conn.request('GET', "/")
+    responce = conn.getresponse()
+    print(responce.read())
 
 def exit_gracefully(signum, frame):
     signal.signal(signal.SIGINT, original_sigint)
     os.write(sys.stdout.fileno(), b"Terminating TOR deamon...")
-    subprocess.Popen.terminate()
     sys.exit(1)
+
+def main():
+    start_proxy(session.proxies)
 
 if __name__ == '__main__':
     original_sigint = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, exit_gracefully)
-    start_proxy(session.proxies)
-    
+    TorProxyHandler = TorHandlerClass()
+    with socketserver.TCPServer((PROXY_HOST, PROXY_PORT), TorProxyHandler) as httpd:
+        print(f"Tor proxy serving at {PROXY_HOST}:{PROXY_PORT}")
+        httpd.serve_forever()
+    main()
